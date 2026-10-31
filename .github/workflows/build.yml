@@ -1,0 +1,83 @@
+name: build-clover-bootimg
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - name: Checkout this repo (carries p-xbl.bin + clover.dtb)
+        uses: actions/checkout@v4
+
+      - name: Install EDK2 cross toolchain (x86_64 -> AArch64)
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -qq --no-install-recommends \
+            git build-essential clang llvm lld uuid-dev nasm gcc-aarch64-linux-gnu \
+            python3 python3-venv python3-pip python3-git gettext \
+            curl rsync device-tree-compiler mtools dosfstools zip unzip ca-certificates
+          git config --global url."https://gh-proxy.com/https://github.com/".insteadOf "https://github.com/"
+
+      - name: Clone UniXNU, the clover board repo and the UEFI overlay
+        run: |
+          git clone --depth 1 https://gh-proxy.com/https://github.com/UniXNU/UniXNU.git UniXNU
+          git clone --depth 1 https://gh-proxy.com/https://github.com/qine233/UniXNU-clover.git UniXNU-clover
+          git clone --depth 1 https://gh-proxy.com/https://github.com/qine233/uefi-clover.git uefi-clover
+          chmod +x UniXNU/unixnu
+
+      - name: Fetch Mu-Silicium at pinned SHAs
+        run: |
+          MIRROR=https://gh-proxy.com/https://github.com \
+            bash uefi-clover/scripts/fetch-mu-silicium.sh "$HOME/mu-clover"
+
+      - name: Apply clover overlay
+        run: |
+          python3 uefi-clover/scripts/apply-clover-overlay.py --uefi "$HOME/mu-clover"
+          python3 uefi-clover/scripts/apply-clover-overlay.py --uefi "$HOME/mu-clover" --no-check
+
+      - name: Extract vendor blobs from this unit's xbl
+        run: |
+          python3 uefi-clover/scripts/extract-clover-blobs.py \
+            --xbl "${{ github.workspace }}/p-xbl.bin" --checkout "$HOME/mu-clover"
+
+      - name: Offline consistency check
+        continue-on-error: true
+        run: |
+          python3 uefi-clover/scripts/check-clover-uefi.py --checkout "$HOME/mu-clover"
+
+      - name: Select defconfig and fetch modules
+        run: |
+          cd UniXNU
+          ./unixnu defconfig clover_defconfig -D "${{ github.workspace }}/UniXNU-clover"
+          ./unixnu fetch
+          ./unixnu tree
+
+      - name: Build the UEFI firmware volume
+        run: |
+          cd UniXNU
+          ./unixnu build firmware \
+            --uefi "$HOME/mu-clover" \
+            --edk2 "$HOME/mu-clover/Mu_Basecore" \
+            --target RELEASE
+
+      - name: Pack the boot image with this unit's DTB
+        run: |
+          cd UniXNU
+          mkdir -p "${{ github.workspace }}/out"
+          ./unixnu bootimg \
+            --uefi "$HOME/mu-clover" \
+            --dtb "${{ github.workspace }}/clover.dtb" \
+            --ramdisk none \
+            --target RELEASE \
+            -o "${{ github.workspace }}/out/clover-boot.img"
+          ls -l "${{ github.workspace }}/out/clover-boot.img"
+          sha256sum "${{ github.workspace }}/out/clover-boot.img"
+
+      - name: Upload boot image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: clover-boot-img
+          path: out/clover-boot.img
+          if-no-files-found: error
