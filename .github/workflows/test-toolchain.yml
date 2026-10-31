@@ -1,0 +1,34 @@
+name: test-kernel-toolchain
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  toolchain:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - name: Checkout UniXNU (for the setup-toolchain script)
+        uses: actions/checkout@v4
+
+      - name: Clone UniXNU repo
+        run: |
+          git config --global url."https://gh-proxy.com/https://github.com/".insteadOf "https://github.com/"
+          git clone --depth 1 https://gh-proxy.com/https://github.com/UniXNU/UniXNU.git UniXNU
+
+      - name: Run setup-toolchain.py (builds clang + mig + iig + lzfse)
+        run: |
+          cd UniXNU
+          sudo python3 scripts/linux/setup-toolchain.py /opt/unixnu-linux 2>&1 | tail -60
+
+      - name: Verify the toolchain is usable
+        run: |
+          echo "=== toolchain dir ==="
+          ls -la /opt/unixnu-linux 2>/dev/null
+          echo "=== clang ==="
+          /opt/unixnu-linux/llvm/bin/clang --version 2>/dev/null || echo "clang missing"
+          echo "=== shims ==="
+          ls -la /opt/unixnu-linux/CommandLineTools/usr/bin/ 2>/dev/null || echo "CLT shims missing"
+          ls -la /opt/unixnu-linux/XcodeDefault.xctoolchain/usr/bin/ 2>/dev/null || echo "Xcode shims missing"
+          echo "=== lzfse ==="
+          ls -la /opt/unixnu-linux/bin/lzfse 2>/dev/null || echo "lzfse missing"
