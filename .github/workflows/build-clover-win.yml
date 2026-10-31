@@ -1,0 +1,52 @@
+name: build-clover-windows-uefi
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - name: Checkout this repo (carries CloverGopDxe source + patch script)
+        uses: actions/checkout@v4
+
+      - name: Clone edk2-msm
+        run: |
+          git config --global url."https://gh-proxy.com/https://github.com/".insteadOf "https://github.com/"
+          git clone --depth 1 --recurse-submodules --shallow-submodules \
+            https://gh-proxy.com/https://github.com/edk2-porting/edk2-msm.git edk2-msm 2>&1 | tail -20
+
+      - name: Apply CloverGopDxe patch
+        run: |
+          bash patch-gop.sh "$GITHUB_WORKSPACE/edk2-msm" "$GITHUB_WORKSPACE"
+          echo "=== verify patch ==="
+          grep -n "CloverGopDxe" edk2-msm/Platform/Qualcomm/sdm660/sdm660.dsc
+          grep -n "CloverGopDxe" edk2-msm/Platform/Qualcomm/sdm660/dxe.fdf.inc
+
+      - name: Install build deps
+        run: |
+          sudo dpkg --add-architecture i386
+          sudo apt-get update -q
+          sudo apt-get install -y -qq --no-install-recommends \
+            build-essential uuid-dev clang llvm iasl nasm gcc-aarch64-linux-gnu \
+            abootimg python3-pil python3-git gettext mtools dosfstools \
+            device-tree-compiler zip unzip ca-certificates
+
+      - name: Build clover (sdm660) UEFI
+        run: |
+          cd edk2-msm
+          ./build.sh --device clover --skip-rootfs-gen 2>&1 | tail -80
+
+      - name: Locate output image
+        run: |
+          echo "=== output images ==="
+          ls -la edk2-msm/*.img 2>/dev/null || echo "no .img in root"
+          find edk2-msm -name "*.img" 2>/dev/null | head -20
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: clover-windows-uefi
+          path: edk2-msm/*.img
+          if-no-files-found: error
