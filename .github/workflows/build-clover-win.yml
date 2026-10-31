@@ -35,21 +35,26 @@ jobs:
 
       - name: Build clover (sdm660) UEFI
         run: |
+          set -e
           cd edk2-msm
-          # platform_build_bootimg needs a ramdisk file (empty is fine for UEFI-only boot)
           touch ramdisk
-          ./build.sh --device clover --skip-rootfs-gen 2>&1 | tail -80
+          ./build.sh --device clover --skip-rootfs-gen > "$GITHUB_WORKSPACE/build-output.txt" 2>&1 || {
+            echo "=== BUILD FAILED, tail of output ==="
+            tail -60 "$GITHUB_WORKSPACE/build-output.txt"
+            exit 1
+          }
+          echo "=== BUILD OK, tail ==="
+          tail -30 "$GITHUB_WORKSPACE/build-output.txt"
 
       - name: Locate output image
         run: |
-          echo "=== all files named boot* or *.img or *.fd anywhere ==="
-          find edk2-msm -maxdepth 4 \( -name "*.img" -o -name "*.fd" -o -name "boot*" \) 2>/dev/null | head -40
-          echo "=== Build dir ==="
-          find edk2-msm/Build -maxdepth 3 -type d 2>/dev/null | head -20
-          echo "=== collect every .img and .fd into out/ ==="
+          echo "=== all .img / .fd / boot* files ==="
+          find edk2-msm -maxdepth 5 \( -name "*.img" -o -name "*.fd" -o -name "boot*" \) 2>/dev/null | head -40
+          echo "=== collect into out/ ==="
           mkdir -p out
           find edk2-msm \( -name "*.img" -o -name "*.fd" \) -exec cp {} out/ \; 2>/dev/null
-          ls -la out/ || echo "out/ empty - no img found"
+          cp build-output.txt out/ 2>/dev/null || true
+          ls -la out/
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
