@@ -36,6 +36,8 @@ jobs:
       - name: Build clover (sdm660) UEFI
         run: |
           cd edk2-msm
+          # platform_build_bootimg needs a ramdisk file (empty is fine for UEFI-only boot)
+          touch ramdisk
           ./build.sh --device clover --skip-rootfs-gen 2>&1 | tail -80
 
       - name: Locate output image

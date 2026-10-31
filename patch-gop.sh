@@ -50,4 +50,16 @@ else:
 PY
 fi
 
+# 4. place this unit's device tree where platform_build_bootimg expects it
+#    (build.sh's Silicon/platform.sh.inc references
+#     Platform/Xiaomi/sdm660/FdtBlob_compat/clover.dtb, which sdm660 lacks)
+DTB="$EDK2/Platform/Xiaomi/sdm660/FdtBlob_compat/clover.dtb"
+if [ -f "$SRC/clover.dtb" ]; then
+  mkdir -p "$(dirname "$DTB")"
+  cp "$SRC/clover.dtb" "$DTB"
+  echo "dtb: placed clover.dtb at $DTB"
+else
+  echo "dtb: $SRC/clover.dtb not found (skipping)"
+fi
+
 echo "patch done"
