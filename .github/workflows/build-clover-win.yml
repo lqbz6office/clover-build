@@ -39,14 +39,15 @@ jobs:
           cd edk2-msm
           touch ramdisk
           ./build.sh --device clover --skip-rootfs-gen > "$GITHUB_WORKSPACE/build-output.txt" 2>&1 || {
-            echo "=== BUILD FAILED, tail of output ==="
-            tail -60 "$GITHUB_WORKSPACE/build-output.txt"
+            echo "BUILD_FAILED_MARKER"
+            tail -80 "$GITHUB_WORKSPACE/build-output.txt"
             exit 1
           }
-          echo "=== BUILD OK, tail ==="
+          echo "BUILD_OK"
           tail -30 "$GITHUB_WORKSPACE/build-output.txt"
 
       - name: Locate output image
+        if: always()
         run: |
           echo "=== all .img / .fd / boot* files ==="
           find edk2-msm -maxdepth 5 \( -name "*.img" -o -name "*.fd" -o -name "boot*" \) 2>/dev/null | head -40
@@ -57,6 +58,7 @@ jobs:
           ls -la out/
 
       - name: Upload artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: clover-windows-uefi
