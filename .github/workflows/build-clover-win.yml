@@ -38,7 +38,8 @@ jobs:
           set -e
           cd edk2-msm
           touch ramdisk
-          ./build.sh --device clover --skip-rootfs-gen > "$GITHUB_WORKSPACE/build-output.txt" 2>&1 || {
+          # do NOT use --skip-rootfs-gen: SimpleInitRootFS.inf needs build/rootfs.c
+          ./build.sh --device clover > "$GITHUB_WORKSPACE/build-output.txt" 2>&1 || {
             echo "BUILD_FAILED_MARKER"
             tail -80 "$GITHUB_WORKSPACE/build-output.txt"
             exit 1
