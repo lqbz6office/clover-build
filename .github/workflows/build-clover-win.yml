@@ -65,3 +65,16 @@ jobs:
           name: clover-windows-uefi
           path: out/**
           if-no-files-found: warn
+
+      - name: Commit img back to repo (so it can be git-pulled)
+        if: always()
+        run: |
+          if [ -f out/boot-clover.img ]; then
+            cp out/boot-clover.img "$GITHUB_WORKSPACE/boot-clover.img"
+            git config user.name "ci" && git config user.email "ci@local"
+            git add boot-clover.img
+            git commit -m "build: boot-clover.img (windows uefi+gop)" || echo "no change"
+            git push origin HEAD:main || echo "push skipped"
+          else
+            echo "no boot-clover.img produced"
+          fi
