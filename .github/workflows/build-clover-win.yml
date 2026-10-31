@@ -41,12 +41,15 @@ jobs:
       - name: Locate output image
         run: |
           echo "=== output images ==="
-          ls -la edk2-msm/*.img 2>/dev/null || echo "no .img in root"
           find edk2-msm -name "*.img" 2>/dev/null | head -20
+          echo "=== collect into out/ ==="
+          mkdir -p out
+          find edk2-msm -name "*.img" -exec cp {} out/ \; 2>/dev/null
+          ls -la out/
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: clover-windows-uefi
-          path: edk2-msm/*.img
+          path: out/*.img
           if-no-files-found: error
