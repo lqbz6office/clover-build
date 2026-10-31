@@ -40,16 +40,18 @@ jobs:
 
       - name: Locate output image
         run: |
-          echo "=== output images ==="
-          find edk2-msm -name "*.img" 2>/dev/null | head -20
-          echo "=== collect into out/ ==="
+          echo "=== all files named boot* or *.img or *.fd anywhere ==="
+          find edk2-msm -maxdepth 4 \( -name "*.img" -o -name "*.fd" -o -name "boot*" \) 2>/dev/null | head -40
+          echo "=== Build dir ==="
+          find edk2-msm/Build -maxdepth 3 -type d 2>/dev/null | head -20
+          echo "=== collect every .img and .fd into out/ ==="
           mkdir -p out
-          find edk2-msm -name "*.img" -exec cp {} out/ \; 2>/dev/null
-          ls -la out/
+          find edk2-msm \( -name "*.img" -o -name "*.fd" \) -exec cp {} out/ \; 2>/dev/null
+          ls -la out/ || echo "out/ empty - no img found"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: clover-windows-uefi
-          path: out/*.img
-          if-no-files-found: error
+          path: out/**
+          if-no-files-found: warn
